@@ -55,7 +55,7 @@ def RGB_color_selection(image):
     #Combine white and yellow masks
     mask = cv2.bitwise_or(white_mask, yellow_mask)
     masked_image = cv2.bitwise_and(image, image, mask = mask)
-    
+
     return masked_image
 
 #list_images(list(map(RGB_color_selection, test_images)))
@@ -78,12 +78,12 @@ def HSV_color_selection(image):
     """
     #Convert the input image to HSV
     converted_image = convert_hsv(image)
-    
+
     #White color mask
     lower_threshold = np.uint8([0, 0, 210])
     upper_threshold = np.uint8([255, 30, 255])
     white_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-    
+
     #Yellow color mask
     lower_threshold = np.uint8([18, 80, 80])
     upper_threshold = np.uint8([30, 255, 255])
@@ -92,7 +92,7 @@ def HSV_color_selection(image):
     #Combine white and yellow masks
     mask = cv2.bitwise_or(white_mask, yellow_mask)
     masked_image = cv2.bitwise_and(image, image, mask = mask)
-    
+
     return masked_image
 
 #list_images(list(map(HSV_color_selection, test_images)))
@@ -114,9 +114,9 @@ def HSL_color_selection(image):
             image: An np.array compatible with plt.imshow.
     """
     #Convert the input image to HSL
-    
+
     converted_image = convert_hsl(image)
-    
+
     #White color mask
     lower_threshold = np.uint8([0, 200, 0])
     upper_threshold = np.uint8([255, 255, 255])
@@ -126,18 +126,18 @@ def HSL_color_selection(image):
     #lower_threshold = np.uint8([0, 200, 0])
     #upper_threshold = np.uint8([255, 255, 255])
     #white_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-    
+
     #Yellow color mask
     lower_threshold = np.uint8([10, 0, 100])
     upper_threshold = np.uint8([40, 255, 255])
     yellow_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-    
+
     #Combine white and yellow masks
     #mask = cv2.bitwise_or(white_mask, yellow_mask)
     #masked_image = cv2.bitwise_and(image, image, mask = mask)
 
     masked_image = cv2.bitwise_and(image, image, mask = white_mask)
-    
+
     return masked_image
 
 #list_images(list(map(HSL_color_selection, test_images)))
@@ -187,7 +187,7 @@ def region_selection(image):
         Parameters:
             image: An np.array compatible with plt.imshow.
     """
-    mask = np.zeros_like(image)   
+    mask = np.zeros_like(image)
     #Defining a 3 channel or 1 channel color to fill the mask with depending on the input image
     if len(image.shape) > 2:
         channel_count = image.shape[2]
@@ -222,11 +222,11 @@ def hough_transform(image):
     maxLineGap = 50    #Maximum allowed gap between points on the same line to link them
     return cv2.HoughLinesP(image, rho = rho, theta = theta, threshold = threshold,
                            minLineLength = minLineLength, maxLineGap = maxLineGap)
-    
+
 
 hough_lines = list(map(hough_transform, masked_image))
 
-def angle_check(x1, x2, y1, y2): 
+def angle_check(x1, x2, y1, y2):
     flag = False
     if (x1-x2) != 0:
         slope_abs = abs((y1-y2)/(x1-x2))
@@ -254,7 +254,7 @@ def draw_lines(image, lines, color = [255, 0, 0], thickness = 2):
 line_images = []
 for image, lines in zip(test_images, hough_lines):
     line_images.append(draw_lines(image, lines))
-    
+
 #list_images(line_images)
 
 def average_slope_intercept(lines):
@@ -267,20 +267,21 @@ def average_slope_intercept(lines):
     left_weights  = [] #(length,)
     right_lines   = [] #(slope, intercept)
     right_weights = [] #(length,)
-    
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            if (x1 == x2):
-                continue
-            slope = (y2 - y1) / (x2 - x1)
-            intercept = y1 - (slope * x1)
-            length = np.sqrt(((y2 - y1) ** 2) + ((x2 - x1) ** 2))
-            if slope < 0:
-                left_lines.append((slope, intercept))
-                left_weights.append((length))
-            else:
-                right_lines.append((slope, intercept))
-                right_weights.append((length))
+
+    if lines is not None:
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                if (x1 == x2):
+                    continue
+                slope = (y2 - y1) / (x2 - x1)
+                intercept = y1 - (slope * x1)
+                length = np.sqrt(((y2 - y1) ** 2) + ((x2 - x1) ** 2))
+                if slope < 0:
+                    left_lines.append((slope, intercept))
+                    left_weights.append((length))
+                else:
+                    right_lines.append((slope, intercept))
+                    right_weights.append((length))
     left_lane  = np.dot(left_weights,  left_lines) / np.sum(left_weights)  if len(left_weights) > 0 else None
     right_lane = np.dot(right_weights, right_lines) / np.sum(right_weights) if len(right_weights) > 0 else None
     return left_lane, right_lane
@@ -296,6 +297,13 @@ def pixel_points(y1, y2, line):
     if line is None:
         return None
     slope, intercept = line
+    if abs(slope) < 1e-3:
+        if slope < 0:
+            slope = -1e-3
+        else:
+            slope = 1e-3
+    # print(y1,intercept,slope)
+
     x1 = int((y1 - intercept)/slope)
     x2 = int((y2 - intercept)/slope)
     y1 = int(y1)
@@ -316,7 +324,7 @@ def lane_lines(image, lines):
     right_line = pixel_points(y1, y2, right_lane)
     return left_line, right_line
 
-    
+
 def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
     """
     Draw lines onto the input image.
@@ -324,15 +332,16 @@ def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
             image: The input test image.
             lines: The output lines from Hough Transform.
             color (Default = red): Line color.
-            thickness (Default = 12): Line thickness. 
+            thickness (Default = 12): Line thickness.
     """
     line_image = np.zeros_like(image)
     for line in lines:
         if line is not None:
-            cv2.line(line_image, *line,  color, thickness)
+            # print(line)
+            cv2.line(line_image, line[0], line[1],  color, thickness)
     return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
-             
-    
+
+
 lane_images = []
 for image, lines in zip(test_images, hough_lines):
     lane_images.append(draw_lane_lines(image, lane_lines(image, lines)))
@@ -352,7 +361,7 @@ def frame_processor(image):
     region       = region_selection(edges)
     hough        = hough_transform(region)
     result       = draw_lane_lines(image, lane_lines(image, hough))
-    return result 
+    return result
 
 def process_video(test_video, output_video):
     """
