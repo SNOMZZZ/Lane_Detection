@@ -36,66 +36,13 @@ def list_images(images, cols = 2, rows = 5, cmap=None):
 test_images = [plt.imread(img) for img in glob.glob('test_images/*.jpg')]
 #list_images(test_images)
 
-def RGB_color_selection(image):
-    """
-    Apply color selection to RGB images to blackout everything except for white and yellow lane lines.
-        Parameters:
-            image: An np.array compatible with plt.imshow.
-    """
-    #White color mask
-    lower_threshold = np.uint8([200, 200, 200])
-    upper_threshold = np.uint8([255, 255, 255])
-    white_mask = cv2.inRange(image, lower_threshold, upper_threshold)
+def mixmin(image):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    clahe = cv2.createCLAHE(clipLimit=2.0,tileGridSize=(8,8))
+    hsv[:,:,2] = clahe.apply(hsv[:,:,2]) 
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-    #Yellow color mask
-    lower_threshold = np.uint8([175, 175,   0])
-    upper_threshold = np.uint8([255, 255, 255])
-    yellow_mask = cv2.inRange(image, lower_threshold, upper_threshold)
-
-    #Combine white and yellow masks
-    mask = cv2.bitwise_or(white_mask, yellow_mask)
-    masked_image = cv2.bitwise_and(image, image, mask = mask)
-
-    return masked_image
-
-#list_images(list(map(RGB_color_selection, test_images)))
-
-def convert_hsv(image):
-    """
-    Convert RGB images to HSV.
-        Parameters:
-            image: An np.array compatible with plt.imshow.
-    """
-    return cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-
-#list_images(list(map(convert_hsv, test_images)))
-
-def HSV_color_selection(image):
-    """
-    Apply color selection to the HSV images to blackout everything except for white and yellow lane lines.
-        Parameters:
-            image: An np.array compatible with plt.imshow.
-    """
-    #Convert the input image to HSV
-    converted_image = convert_hsv(image)
-
-    #White color mask
-    lower_threshold = np.uint8([0, 0, 210])
-    upper_threshold = np.uint8([255, 30, 255])
-    white_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-
-    #Yellow color mask
-    lower_threshold = np.uint8([18, 80, 80])
-    upper_threshold = np.uint8([30, 255, 255])
-    yellow_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-
-    #Combine white and yellow masks
-    mask = cv2.bitwise_or(white_mask, yellow_mask)
-    masked_image = cv2.bitwise_and(image, image, mask = mask)
-
-    return masked_image
-
-#list_images(list(map(HSV_color_selection, test_images)))
+test_images = list(map(mixmin, test_images))
 
 def convert_hsl(image):
     """
@@ -118,29 +65,15 @@ def HSL_color_selection(image):
     converted_image = convert_hsl(image)
 
     #White color mask
-    lower_threshold = np.uint8([0, 200, 0])
+    lower_threshold = np.uint8([0, 150, 0])
     upper_threshold = np.uint8([255, 255, 255])
     white_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-
-    #White color mask
-    #lower_threshold = np.uint8([0, 200, 0])
-    #upper_threshold = np.uint8([255, 255, 255])
-    #white_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-
-    #Yellow color mask
-    lower_threshold = np.uint8([10, 0, 100])
-    upper_threshold = np.uint8([40, 255, 255])
-    yellow_mask = cv2.inRange(converted_image, lower_threshold, upper_threshold)
-
-    #Combine white and yellow masks
-    #mask = cv2.bitwise_or(white_mask, yellow_mask)
-    #masked_image = cv2.bitwise_and(image, image, mask = mask)
 
     masked_image = cv2.bitwise_and(image, image, mask = white_mask)
 
     return masked_image
 
-#list_images(list(map(HSL_color_selection, test_images)))
+list_images(list(map(HSL_color_selection, test_images)))
 
 color_selected_images = list(map(HSL_color_selection, test_images))
 
@@ -153,9 +86,9 @@ def gray_scale(image):
     return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
 gray_images = list(map(gray_scale, color_selected_images))
-#list_images(gray_images)
+list_images(gray_images)
 
-def gaussian_smoothing(image, kernel_size = 11):
+def gaussian_smoothing(image, kernel_size = 17):
     """
     Apply Gaussian filter to the input image.
         Parameters:
@@ -197,17 +130,20 @@ def region_selection(image):
     #We could have used fixed numbers as the vertices of the polygon,
     #but they will not be applicable to images with different dimesnions.
     rows, cols = image.shape[:2]
-    bottom_left  = [cols * 0, rows * 1]
-    top_left     = [cols * 0.5, rows * 0.25]
-    bottom_right = [cols * 1, rows * 1]
-    top_right    = [cols * 0.5, rows * 0.25]
-    vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
+    bottom_left  = [cols * 0, rows * 0.2]
+    middle_left  = [cols * 0, rows * 1]
+    top_left     = [cols * 0.5, rows * 0.1]
+    bottom_right = [cols * 1, rows * 0.2]
+    middle_right = [cols * 1, rows * 1]
+    top_right    = [cols * 0.5, rows * 0.1]
+
+    vertices = np.array([[middle_left, bottom_left, top_left, top_right, bottom_right, middle_right]], dtype=np.int32)
     cv2.fillPoly(mask, vertices, ignore_mask_color)
     masked_image = cv2.bitwise_and(image, mask)
     return masked_image
 
 masked_image = list(map(region_selection, edge_detected_images))
-#list_images(masked_image)
+list_images(masked_image)
 
 def hough_transform(image):
     """
@@ -218,7 +154,7 @@ def hough_transform(image):
     rho = 1              #Distance resolution of the accumulator in pixels.
     theta = np.pi/360    #Angle resolution of the accumulator in radians.
     threshold = 100       #Only lines that are greater than threshold will be returned.
-    minLineLength = 300   #Line segments shorter than that are rejected.
+    minLineLength = 250   #Line segments shorter than that are rejected.
     maxLineGap = 50    #Maximum allowed gap between points on the same line to link them
     return cv2.HoughLinesP(image, rho = rho, theta = theta, threshold = threshold,
                            minLineLength = minLineLength, maxLineGap = maxLineGap)
@@ -302,7 +238,6 @@ def pixel_points(y1, y2, line):
             slope = -1e-3
         else:
             slope = 1e-3
-    # print(y1,intercept,slope)
 
     x1 = int((y1 - intercept)/slope)
     x2 = int((y2 - intercept)/slope)
@@ -319,7 +254,7 @@ def lane_lines(image, lines):
     """
     left_lane, right_lane = average_slope_intercept(lines)
     y1 = image.shape[0]
-    y2 = y1 * 0.6
+    y2 = y1 * 0.5
     left_line  = pixel_points(y1, y2, left_lane)
     right_line = pixel_points(y1, y2, right_lane)
     return left_line, right_line
@@ -346,7 +281,7 @@ lane_images = []
 for image, lines in zip(test_images, hough_lines):
     lane_images.append(draw_lane_lines(image, lane_lines(image, lines)))
 
-list_images(lane_images)
+#list_images(lane_images)
 
 def frame_processor(image):
     """
@@ -374,9 +309,10 @@ def process_video(test_video, output_video):
     processed = input_video.fl_image(frame_processor)
     processed.write_videofile(os.path.join('output_videos', output_video), audio=False)
 
-process_video('XPlane_KSFO.mp4', 'XPlane_KSFO_output.mp4')
+
+process_video('RJTT_stratus_vis1000_1200.mp4', 'RJTT_stratus_vis1000_1200_output.mp4')
 HTML("""
 <video width="960" height="540" controls>
   <source src="{0}">
 </video>
-""".format("output_videos\XPlane_KSFO_output.mp4"))
+""".format("output_videos\RJTT_stratus_vis1000_1200_output.mp4"))
