@@ -36,14 +36,6 @@ def list_images(images, cols = 2, rows = 5, cmap=None):
 test_images = [plt.imread(img) for img in glob.glob('test_images/*.jpg')]
 #list_images(test_images)
 
-def mixmin(image):
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    clahe = cv2.createCLAHE(clipLimit=2.0,tileGridSize=(8,8))
-    hsv[:,:,2] = clahe.apply(hsv[:,:,2]) 
-    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-test_images = list(map(mixmin, test_images))
-
 def convert_hsl(image):
     """
     Convert RGB images to HSL.
@@ -88,7 +80,7 @@ def gray_scale(image):
 gray_images = list(map(gray_scale, color_selected_images))
 list_images(gray_images)
 
-def gaussian_smoothing(image, kernel_size = 17):
+def gaussian_smoothing(image, kernel_size = 11):
     """
     Apply Gaussian filter to the input image.
         Parameters:
